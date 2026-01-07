@@ -1,0 +1,17 @@
+Dataset,Experiment,Metric,Value
+CNN_DailyMail,NeMo_Curator,rouge1,0.1349464738757695
+CNN_DailyMail,NeMo_Curator,rouge2,0.012960263023638115
+CNN_DailyMail,NeMo_Curator,rougeL,0.10011593747137773
+CNN_DailyMail,NeMo_Curator,rougeLsum,0.10281752356733682
+CNN_DailyMail,Phi3_Mini_Only,rouge1,0.18334656249273004
+CNN_DailyMail,Phi3_Mini_Only,rouge2,0.024744553691922112
+CNN_DailyMail,Phi3_Mini_Only,rougeL,0.12694346465791478
+CNN_DailyMail,Phi3_Mini_Only,rougeLsum,0.15436217431066046
+GSM8K,NeMo_Curator,Exact_Match,0.0
+GSM8K,Phi3_Mini_Only,Exact_Match,0.1
+NLI_MNLI,NeMo_Curator,Accuracy,0.0
+NLI_MNLI,Phi3_Mini_Only,Accuracy,0.3
+SQuAD_v2,NeMo_Curator,Exact_Match,0.0
+SQuAD_v2,Phi3_Mini_Only,Exact_Match,0.0
+SST-2,NeMo_Curator,Accuracy,0.0
+SST-2,Phi3_Mini_Only,Accuracy,0.0

@@ -5,9 +5,13 @@ import sys
 import argparse
 import torch
 from datasets import load_from_disk
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from codecarbon import EmissionsTracker, EmissionsTracker
 from llmlingua import PromptCompressor
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Path Setup for Nvidia Classifier ---
 # Matches final.py logic
@@ -102,7 +106,27 @@ def compress_text(prompt, verbose=False):
         "compressed_tokens": len(compressor.tokenizer.encode(compressed_prompt_text)),
     }
 
+
+# --- Gemini API Helper ---
+def call_gemini_api(prompt):
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        return "ERROR: GOOGLE_API_KEY not found in environment variables."
+    
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-3-flash-preview')
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Gemini API Error: {e}"
+
 # --- Model Loading (Replicating final.py quirks) ---
+def load_model3():
+    # Placeholder for consistency, though we use API directly
+    return "gemini", None
+
 def load_model1(): # Phi-3
     model_id = "microsoft/Phi-3-mini-4k-instruct"
     # print(f"Loading {model_id} (Phi-3)...")
@@ -203,11 +227,14 @@ def main():
                 models_cache[name] = load_model1()
             elif name == "tinyllama":
                 models_cache[name] = load_model2()
-        return models_cache[name]=
+            elif name == "gemini":
+                models_cache[name] = load_model3()
+        return models_cache[name]
 
     experiments = [
-        {"name": "NeMo_Curator", "use_nemo": True, "use_lingua": True},
-        {"name": "Phi3_Mini_Only", "use_nemo": False, "use_lingua": False}
+        {"name": "NeMo_Curator", "use_nemo": True, "use_lingua": True, "default_model": "phi3"},
+        {"name": "Phi3_Mini_Only", "use_nemo": False, "use_lingua": False, "default_model": "phi3"},
+        {"name": "Gemini_Only", "use_nemo": False, "use_lingua": False, "default_model": "gemini"}
     ]
     
     results = []
@@ -256,11 +283,13 @@ def main():
                         compression_rate = comp_res["rate"]
                     
                     # 3. Model Selection
-                    selected_model_name = "phi3" # Default for Phi3 Only
+                    selected_model_name = experiment.get("default_model", "phi3") # Default from config
                     if experiment["use_nemo"]:
                         # final.py logic:
                         if category == "Easy":
                             selected_model_name = "tinyllama" # Logic says load_model1 (Phi3) for Easy
+                        elif category == "Hard":
+                            selected_model_name = "gemini"
                         else:
                             selected_model_name = "phi3" # Logic says load_model2 (TinyLlama) for others
                     
@@ -282,15 +311,18 @@ def main():
                     
                     start_time = time.time()
                     try:
-                        inputs = tokenizer(compressed_prompt, return_tensors="pt").to(model.device)
-                        with torch.no_grad():
-                            outputs = model.generate(
-                                **inputs, 
-                                max_new_tokens=50, # Keep it short for speed
-                                do_sample=True
-                            )
-                        # Decode output
-                        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                        if selected_model_name == "gemini":
+                            generated_text = call_gemini_api(compressed_prompt)
+                        else:
+                            inputs = tokenizer(compressed_prompt, return_tensors="pt").to(model.device)
+                            with torch.no_grad():
+                                outputs = model.generate(
+                                    **inputs, 
+                                    max_new_tokens=50, # Keep it short for speed
+                                    do_sample=True
+                                )
+                            # Decode output
+                            generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
                         
                         # Simple post-processing to remove the prompt from the output if it's included
                         # (Phi-3 and others often echo the prompt)

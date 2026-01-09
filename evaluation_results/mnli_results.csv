@@ -1,0 +1,4 @@
+prompt,reference,prediction,score
+"Premise: The new rights are nice enough
+Hypothesis: Everyone really likes the newest benefits 
+Does the premise entail, contradict, or is it neutral to the hypothesis? Answer:",neutral,neutral,1.0

@@ -197,19 +197,50 @@ def load_model():
 def analyze_prompt(model, tokenizer, prompt_text):
     if isinstance(prompt_text, str):
         prompt_text = [prompt_text]
+    
+    # Initialize accumulator for batch results
+    batch_results = {}
+    
+    for text in prompt_text:
+        # Tokenize with sliding window
+        encoded_texts = tokenizer(
+            text,
+            return_tensors="pt",
+            add_special_tokens=True,
+            max_length=512,
+            padding="max_length",
+            truncation=True,
+            stride=256,
+            return_overflowing_tokens=True
+        )
         
-    encoded_texts = tokenizer(
-        prompt_text,
-        return_tensors="pt",
-        add_special_tokens=True,
-        max_length=512,
-        padding="max_length",
-        truncation=True,
-    )
-
-    with torch.no_grad():
-        result = model(encoded_texts)
-    return result
+        # Clean inputs for model
+        model_inputs = {k: v for k, v in encoded_texts.items() if k in ["input_ids", "attention_mask"]}
+        
+        with torch.no_grad():
+            chunk_results = model(model_inputs)
+            
+        # Aggregation: Select the chunk with the highest complexity score
+        # chunk_results values are lists of length num_chunks
+        
+        scores = chunk_results.get("prompt_complexity_score", [0.0] * len(chunk_results.get("creativity_scope", [])))
+        
+        # Find index of max complexity
+        best_idx = 0
+        max_score = -1.0
+        
+        for i, score in enumerate(scores):
+            if score > max_score:
+                max_score = score
+                best_idx = i
+                
+        # Append the best chunk's attributes to the batch results
+        for k, v in chunk_results.items():
+            if k not in batch_results:
+                batch_results[k] = []
+            batch_results[k].append(v[best_idx])
+            
+    return batch_results
 
 if __name__ == "__main__":
     model, tokenizer = load_model()

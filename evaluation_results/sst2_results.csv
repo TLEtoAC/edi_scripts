@@ -1,0 +1,5 @@
+prompt,reference,prediction,score
+"Sentence: it 's a charming and often affecting journey . 
+Is this sentence positive or negative? Answer:",1,"positive
+
+sent",1.0

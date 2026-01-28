@@ -85,7 +85,7 @@ class ModelManager:
         return self._load_generic_model("tier3", model_id, use_auth=True)
 
     def _load_generic_model(self, tier_key, model_id, use_auth=False, use_cache_config=True):
-        model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        #model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         token = os.getenv("HF_TOKEN") if use_auth else None
         if use_auth and not token:
              print("Warning: HF_TOKEN not found for authenticated model.")

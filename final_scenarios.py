@@ -33,7 +33,7 @@ if prompt_class_dir not in sys.path:
     sys.path.append(prompt_class_dir)
 
 try:
-    import temp as nvidia_classifier
+    import nvidia_classifier
 except ImportError as e:
     print(f"Warning: Could not import nvidia_classifier from {prompt_class_dir}: {e}")
     nvidia_classifier = None
@@ -59,7 +59,7 @@ def get_device():
     """Returns the primary device (cuda or cpu). Avoids mps as requested."""
     if torch.cuda.is_available():
         return "cuda"
-    return "cpu"
+    return "mpu"
 
 # --- 1. Model Loading ---
 
@@ -73,13 +73,30 @@ def load_tier1():
     model_id = "microsoft/Phi-3-mini-4k-instruct"
     
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, 
-            torch_dtype=torch.float16, 
-            device_map="auto",
-            trust_remote_code=True
-        )
+        print(f"Checking for local weights for {model_id}...")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto",
+                trust_remote_code=True,
+                local_files_only=True
+            )
+            print("Loaded Tier 1 (Phi-3) from local cache.")
+        except OSError:
+            print("Local weights not0 found, downloading/loading from Hub...")
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto",
+                trust_remote_code=True
+            )
+        # Disable cache to avoid AttributeError: 'DynamicCache' object has no attribute 'seen_tokens'
+        # caused by transformers version incompatibility with Phi-3 remote code
+        model.generation_config.use_cache = False
+        
         MODELS["tier1"] = model
         TOKENIZERS["tier1"] = tokenizer
         return model, tokenizer
@@ -97,12 +114,24 @@ def load_tier2():
     model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, 
-            torch_dtype=torch.float16, 
-            device_map="auto"
-        )
+        print(f"Checking for local weights for {model_id}...")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto",
+                local_files_only=True
+            )
+            print("Loaded Tier 2 from local cache.")
+        except OSError:
+            print("Local weights not found, downloading/loading from Hub...")
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto"
+            )
         MODELS["tier2"] = model
         TOKENIZERS["tier2"] = tokenizer
         return model, tokenizer
@@ -117,20 +146,33 @@ def load_tier3():
         return MODELS["tier3"], TOKENIZERS["tier3"]
 
     print("Loading Tier 3 (Llama 2 13B)...")
-    model_id = "meta-llama/Llama-2-13b-chat-hf"
+    model_id = "mistralai/Mistral-7B-Instruct-v0.2"
     
     token = os.getenv("HF_TOKEN")
     if not token:
         print("Warning: HF_TOKEN not found in environment. Please add it to your .env file.")
     
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, 
-            torch_dtype=torch.float16, 
-            device_map="auto",
-            token=token
-        )
+        print(f"Checking for local weights for {model_id}...")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id, token=token, local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto",
+                token=token,
+                local_files_only=True
+            )
+            print("Loaded Tier 3 from local cache.")
+        except OSError:
+            print("Local weights not found, downloading/loading from Hub...")
+            tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.float16, 
+                device_map="auto",
+                token=token
+            )
         MODELS["tier3"] = model
         TOKENIZERS["tier3"] = tokenizer
         return model, tokenizer
@@ -196,7 +238,9 @@ def get_prompt_category(prompt):
              except:
                 complexity_score = 0.0
         
-        return classify_complexity(complexity_score)
+        category = classify_complexity(complexity_score)
+        print(f"[DEBUG] Prompt Analysis: Score={complexity_score:.4f}, Category={category}")
+        return category
         
     except Exception as e:
         print(f"Error classifying prompt: {e}")
@@ -210,12 +254,16 @@ def route_prompt(category):
     Hard -> Tier 3 (Llama 2)
     """
     if category == "Easy":
+        print(f"[DEBUG] Routing to Tier 1 ({category})")
         return "tier1", load_tier1()
     elif category == "Medium":
+        print(f"[DEBUG] Routing to Tier 2 ({category})")
         return "tier2", load_tier2()
     elif category == "Hard":
+        print(f"[DEBUG] Routing to Tier 3 ({category})")
         return "tier3", load_tier3()
     else:
+        print(f"[DEBUG] Routing Fallback to Tier 2 ({category})")
         return "tier2", load_tier2() # Fallback
 
 # --- 3. Compressor Logic ---
@@ -273,6 +321,7 @@ def compress_prompt(prompt):
             
         final_tokens = len(compressor.tokenizer.encode(compressed_text))
         
+        print(f"[DEBUG] Compression: Rate={rate:.2f}, Init={token_count}, Final={final_tokens}")
         return {
             "compressed_prompt": compressed_text,
             "rate": rate,
@@ -287,6 +336,7 @@ def compress_prompt(prompt):
 # --- 4. Generation ---
 
 def generate(model_weights, prompt):
+    print(f"[DEBUG] Generating... Prompt (first 100): {prompt[:100]}...")
     if not model_weights or model_weights[0] is None:
         return "Error: Model not loaded"
         
@@ -317,7 +367,7 @@ def generate(model_weights, prompt):
         
     # Decode only the new tokens
     generated_text = tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
-    
+    print(f"[DEBUG] Generated (first 100): {generated_text.strip()[:100]}...")
     return generated_text.strip()
 
 # --- 5. Evaluation Metrics ---
@@ -427,15 +477,39 @@ def main():
     print(f"Starting Evaluation for {args.samples} samples per dataset...")
     
     for ds_name, subset, split in target_datasets:
-        print(f"\nProcessing Dataset: {ds_name}...")
+        # Local Dataset Loading
+        data_files = {}
+        if ds_name == "glue" and subset == "mnli":
+             data_path = os.path.join(current_dir, "data", "NLI_MNLI", "validation_matched", "*.arrow")
+        elif ds_name == "glue" and subset == "sst2":
+             data_path = os.path.join(current_dir, "data", "SST-2", "validation", "*.arrow")
+        elif ds_name == "squad_v2":
+             data_path = os.path.join(current_dir, "data", "SQuAD_v2", "validation", "*.arrow")
+        elif ds_name == "cnn_dailymail":
+             data_path = os.path.join(current_dir, "data", "CNN_DailyMail", "test", "*.arrow")
+        elif ds_name == "gsm8k":
+             data_path = os.path.join(current_dir, "data", "GSM8K", "test", "*.arrow")
+        else:
+             print(f"Unknown local path for {ds_name}/{subset}")
+             continue
+
+        print(f"\nProcessing Dataset: {ds_name} (Local Arrow)...")
         try:
-            full_split = f"{split}[:{args.samples}]"
-            data = load_dataset(ds_name, subset, split=full_split)
+            # Load from local arrow files
+            # Note: split slicing [0:samples] is done after loading for Arrow datasets usually, 
+            # or we load normally and then select. 
+            dataset = load_dataset("arrow", data_files=data_path, split="train") 
+            # Arrow loading often puts everything in 'train' split by default if not specified differently in data_files dict
+            
+            # Slice the dataset
+            data = dataset.select(range(min(len(dataset), args.samples)))
+            
         except Exception as e:
-            print(f"Failed to load {ds_name}: {e}")
+            print(f"Failed to load local dataset {ds_name} from {data_path}: {e}")
             continue
 
         for i, item in enumerate(tqdm(data, desc=ds_name)):
+            print(f"\n[DEBUG] --- Sample {i+1}/{len(data)} ---")
             # Construct Prompt & Reference
             prompt = ""
             reference = ""
@@ -464,6 +538,7 @@ def main():
             
             for sc in scenarios:
                 sid = sc["id"]
+                print(f"[DEBUG] Running Scenario: {sid} - {sc['name']}")
                 
                 # Determine Model
                 tier_key = ""
@@ -525,6 +600,8 @@ def main():
                         elif ds_name == "gsm8k":
                             score = evaluate_gsm8k(output, reference)
                             score_type = "EM"
+                        
+                        print(f"[DEBUG] Evaluation: Score={score} ({score_type})")
                     except:
                         pass # Score remains 0
 
@@ -558,6 +635,40 @@ def main():
         print(f"\nSuccess! Results saved to {args.output_csv}")
     else:
         print("No results generated.")
+
+    # --- Summary ---
+    if results:
+        print("\n" + "="*40)
+        print("           EVALUATION SUMMARY")
+        print("="*40)
+        
+        # 1. Overall Accuracy per Scenario
+        print("\n--- Overall Accuracy by Scenario ---")
+        summary_scen = df.groupby(["scenario_id", "scenario_name"])["accuracy_score"].mean().reset_index()
+        summary_scen["accuracy_score"] = summary_scen["accuracy_score"].map("{:.2%}".format)
+        print(summary_scen.to_string(index=False))
+        
+        # 2. Detailed Accuracy per Dataset
+        print("\n--- Accuracy by Scenario & Dataset ---")
+        summary_detail = df.groupby(["scenario_id", "scenario_name", "dataset"])["accuracy_score"].mean().reset_index()
+        summary_detail["accuracy_score"] = summary_detail["accuracy_score"].map("{:.2%}".format)
+        print(summary_detail.to_string(index=False))
+        
+        # 3. Average Carbon Emissions (kg) per Scenario
+        print("\n--- Avg Carbon Emissions (kg) by Scenario ---")
+        summary_carbon = df.groupby(["scenario_id", "scenario_name"])["carbon_kg"].mean().reset_index()
+        summary_carbon["carbon_kg"] = summary_carbon["carbon_kg"].map("{:.6f}".format)
+        print(summary_carbon.to_string(index=False))
+
+        print("\n" + "="*40)
+        
+        # Save Summary to CSV
+        summary_csv_path = args.output_csv.replace(".csv", "_summary.csv")
+        if not summary_csv_path.endswith(".csv"):
+             summary_csv_path += "_summary.csv"
+             
+        summary_detail.to_csv(summary_csv_path, index=False)
+        print(f"\nSummary results saved to {summary_csv_path}")
 
 if __name__ == "__main__":
     main()

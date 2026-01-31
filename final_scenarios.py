@@ -8,8 +8,9 @@ import csv
 import re
 import sys
 import gc
+import signal
 from datetime import datetime
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import evaluate
 from tqdm import tqdm
@@ -85,7 +86,7 @@ class ModelManager:
         return self._load_generic_model("tier3", model_id, use_auth=True)
 
     def _load_generic_model(self, tier_key, model_id, use_auth=False, use_cache_config=True):
-        #model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        model_id = "microsoft/Phi-3-mini-4k-instruct"
         token = os.getenv("HF_TOKEN") if use_auth else None
         if use_auth and not token:
              print("Warning: HF_TOKEN not found for authenticated model.")
@@ -278,29 +279,40 @@ class DatasetLoader:
         self.data_root = data_root
 
     def get_local_path(self, ds_name, subset, split):
-        # Map dataset args to local file paths
+        # Map dataset args to local dataset directories and their splits
+        # Returns tuple of (dataset_dir, split_name)
         paths = {
-            ("glue", "mnli"): os.path.join(self.data_root, "data", "NLI_MNLI", "validation_matched", "*.arrow"),
-            ("glue", "sst2"): os.path.join(self.data_root, "data", "SST-2", "validation", "*.arrow"),
-            ("squad_v2", None): os.path.join(self.data_root, "data", "SQuAD_v2", "validation", "*.arrow"),
-            ("cnn_dailymail", "3.0.0"): os.path.join(self.data_root, "data", "CNN_DailyMail", "test", "*.arrow"),
-            ("gsm8k", "main"): os.path.join(self.data_root, "data", "GSM8K", "test", "*.arrow")
+            ("glue", "mnli"): (os.path.join(self.data_root, "data", "NLI_MNLI"), "validation_matched"),
+            ("glue", "sst2"): (os.path.join(self.data_root, "data", "SST-2"), "validation"),
+            ("squad_v2", None): (os.path.join(self.data_root, "data", "SQuAD_v2"), "validation"),
+            ("cnn_dailymail", "3.0.0"): (os.path.join(self.data_root, "data", "CNN_DailyMail"), "test"),
+            ("gsm8k", "main"): (os.path.join(self.data_root, "data", "GSM8K"), "test")
         }
         return paths.get((ds_name, subset))
 
     def load(self, ds_name, subset, split, samples):
-        path = self.get_local_path(ds_name, subset, split)
-        if not path:
+        path_info = self.get_local_path(ds_name, subset, split)
+        if not path_info:
             print(f"Unknown local path for {ds_name}/{subset}")
             return []
 
+        dataset_dir, split_name = path_info
+        
         try:
-            # Loading 'train' split because Arrow local load defaults to generic split name
-            ds = load_dataset("arrow", data_files=path, split="train")
+            # Load the dataset dictionary from the local directory using load_from_disk
+            # HuggingFace datasets cache with dataset_dict.json at root
+            ds_dict = load_from_disk(dataset_dir)
+            
+            # Access the specific split
+            if split_name not in ds_dict:
+                print(f"Split '{split_name}' not found. Available: {list(ds_dict.keys())}")
+                return []
+            
+            ds = ds_dict[split_name]
             ds = ds.select(range(min(len(ds), samples)))
             return ds
         except Exception as e:
-            print(f"Dataset load error ({path}): {e}")
+            print(f"Dataset load error ({dataset_dir}, split={split_name}): {e}")
             return []
 
     def format_sample(self, item, ds_name, subset):
@@ -411,6 +423,8 @@ class ExperimentRunner:
         self.ie = IntelligenceEngine(self.mm)
         self.loader = DatasetLoader(data_root)
         self.results = []
+        self.csv_initialized = False
+        self.interrupted = False
         
         self.scenarios = [
             {"id": "S1", "name": "Upper Bound (Tier 3)", "routing": False, "compression": False, "fixed": "tier3"},
@@ -419,6 +433,18 @@ class ExperimentRunner:
             {"id": "S4", "name": "Routing Only", "routing": True, "compression": False, "fixed": None},
             {"id": "S5", "name": "EcoPrompt (Routing + Comp)", "routing": True, "compression": True, "fixed": None},
         ]
+        
+        # Setup signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals gracefully."""
+        print("\n\n⚠️  Process interrupted! Saving results before exit...")
+        self.interrupted = True
+        self._save_results()
+        print("✅ Results saved. Exiting gracefully.")
+        sys.exit(0)
 
     def run(self):
         # 1. Filter Datasets
@@ -454,17 +480,25 @@ class ExperimentRunner:
 
         # 4. Main Loop
         for ds_name, subset, split in target_dsets:
+            if self.interrupted:
+                break
+                
             print(f"\ndataset: {ds_name} ({subset or ''})")
             data = self.loader.load(ds_name, subset, split, self.args.samples)
             if not data: continue
             
             for i, item in enumerate(tqdm(data)):
+                if self.interrupted:
+                    break
+                    
                 prompt, ref, unique_ds_name = self.loader.format_sample(item, ds_name, subset)
                 
                 # Analyze once per sample
                 category = self.ie.classify_complexity(prompt)
                 
                 for sc in active_scenarios:
+                    if self.interrupted:
+                        break
                     self._run_scenario(sc, i, prompt, ref, category, unique_ds_name, tracker)
 
         self._save_results()
@@ -495,6 +529,8 @@ class ExperimentRunner:
             if tracker: tracker.start()
             output = self.mm.generate(tier, final_prompt)
             if tracker: emissions = tracker.stop()
+            print("ek prompt hogaya")
+            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         except Exception as e:
             print(f"Gen Error: {e}")
             output = "Error"
@@ -523,18 +559,68 @@ class ExperimentRunner:
             "carbon_kg": emissions,
             "accuracy_score": score,
             "score_type": stype,
-            "output_excerpt": output[:100].replace("\n", " ")
+            "output_excerpt": output[:100].replace("\n", " "),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         self.results.append(row)
+        
+        # Immediately save to CSV to prevent data loss
+        self._append_to_csv(row)
 
+    def _initialize_csv(self):
+        """Initialize CSV file with headers if it doesn't exist or is empty."""
+        if not self.csv_initialized:
+            fieldnames = [
+                "scenario_id", "scenario_name", "dataset", "sample_index",
+                "prompt_complexity", "model_used", "original_prompt_len",
+                "compressed_prompt_len", "compression_rate", "carbon_kg",
+                "accuracy_score", "score_type", "output_excerpt", "timestamp"
+            ]
+            
+            # Check if file exists and has content
+            file_exists = os.path.exists(self.args.output_csv)
+            if file_exists:
+                with open(self.args.output_csv, 'r') as f:
+                    file_empty = len(f.read().strip()) == 0
+            else:
+                file_empty = True
+            
+            # Write headers if file is new or empty
+            if not file_exists or file_empty:
+                with open(self.args.output_csv, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                print(f"Initialized CSV file: {self.args.output_csv}")
+            
+            self.csv_initialized = True
+    
+    def _append_to_csv(self, row):
+        """Append a single row to the CSV file immediately."""
+        self._initialize_csv()
+        
+        try:
+            with open(self.args.output_csv, 'a', newline='') as f:
+                fieldnames = [
+                    "scenario_id", "scenario_name", "dataset", "sample_index",
+                    "prompt_complexity", "model_used", "original_prompt_len",
+                    "compressed_prompt_len", "compression_rate", "carbon_kg",
+                    "accuracy_score", "score_type", "output_excerpt", "timestamp"
+                ]
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writerow(row)
+                f.flush()  # Force write to disk immediately
+                os.fsync(f.fileno())  # Ensure OS buffers are written to disk
+        except Exception as e:
+            print(f"Error appending to CSV: {e}")
+    
     def _save_results(self):
+        """Generate summary and pivot tables from collected results."""
         if not self.results:
             print("No results to save.")
             return
 
         df = pd.DataFrame(self.results)
-        df.to_csv(self.args.output_csv, index=False)
-        print(f"\nSaved main results to {self.args.output_csv}")
+        print(f"\nMain results already saved to {self.args.output_csv}")
 
         # Summary
         summary = df.groupby(["scenario_id", "scenario_name", "dataset"])["accuracy_score"].mean().reset_index()
@@ -568,11 +654,32 @@ def main():
     parser.add_argument("--no_tracking", action="store_true")
     parser.add_argument("--datasets", nargs="+", default=["all"])
     parser.add_argument("--scenarios", nargs="+", default=["all"])
+    parser.add_argument("--data_root", type=str, default=None, help="Root directory containing data folder")
     args = parser.parse_args()
 
-    # Determine project root (one level up from this script in scenarios_evaluation)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
+    # Determine project root - auto-detect data directory location
+    if args.data_root:
+        project_root = args.data_root
+    else:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Try multiple locations for data directory
+        # 1. Parent directory (for scenarios_evaluation subfolder structure)
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, "data")):
+            project_root = parent_dir
+        # 2. Current script directory (for co-located scripts)
+        elif os.path.exists(os.path.join(script_dir, "data")):
+            project_root = script_dir
+        # 3. Home directory (for GPU server setup)
+        elif os.path.exists(os.path.join(os.path.expanduser("~"), "data")):
+            project_root = os.path.expanduser("~")
+        else:
+            # Fallback to parent directory
+            project_root = parent_dir
+    
+    print(f"[INFO] Using data root: {project_root}")
+    print(f"[INFO] Looking for data in: {os.path.join(project_root, 'data')}")
     
     runner = ExperimentRunner(args, data_root=project_root)
     runner.run()

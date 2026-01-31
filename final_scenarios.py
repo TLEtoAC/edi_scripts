@@ -324,19 +324,19 @@ class DatasetLoader:
         display_name = f"{ds_name}/{subset}" if subset else ds_name
 
         if ds_name == "glue" and subset == "mnli":
-            prompt = f"Premise: {item['premise']}\nHypothesis: {item['hypothesis']}\nlabel (entailment, neutral, contradiction):"
+            prompt = f'Determine if the premise entails, contradicts, or is neutral to the hypothesis. Output only the label "entailment", "contradiction", or "neutral".\n\nPremise: {item["premise"]}\nHypothesis: {item["hypothesis"]}\nLabel:'
             ref = item['label']
         elif ds_name == "glue" and subset == "sst2":
-            prompt = f"Sentence: {item['sentence']}\nSentiment (positive, negative):"
+            prompt = f'Classify the sentiment of the following sentence as "positive" or "negative". Output only the label.\n\nSentence: {item["sentence"]}\nSentiment:'
             ref = item['label']
         elif ds_name == "squad_v2":
-            prompt = f"Context: {item['context']}\nQuestion: {item['question']}\nAnswer:"
+            prompt = f'Answer the question based on the context below. If the question cannot be answered from the context, output "unanswerable".\n\nContext: {item["context"]}\nQuestion: {item["question"]}\nAnswer:'
             ref = item['answers']
         elif ds_name == "cnn_dailymail":
-            prompt = f"Summarize:\n{item['article'][:2000]}"
+            prompt = f"Summarize the following article.\n\nArticle:\n{item['article'][:2000]}\n\nSummary:"
             ref = item['highlights']
         elif ds_name == "gsm8k":
-            prompt = f"Question: {item['question']}\nThink step by step:"
+            prompt = f"Question: {item['question']}\nLet's think step by step."
             ref = item['answer']
             
         return prompt, ref, display_name

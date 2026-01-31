@@ -512,7 +512,9 @@ class DatasetLoader:
             prompt = f"Summarize the following article.\n\nArticle:\n{item['article'][:2000]}\n\nSummary:"
             ref = item['highlights']
         elif ds_name == "gsm8k":
-            prompt = f"Question: {item['question']}\nLet's think step by step."
+            prompt = f"""Question: {item['question']}
+Let's think step by step. Put your final answer within ####.
+####"""
             ref = item['answer']
             
         return prompt, ref, display_name

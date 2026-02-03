@@ -717,8 +717,7 @@ class ExperimentRunner:
         # Initialize fresh tracker for each prompt
         tracker = None
         if not self.args.no_tracking:
-            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=False, log_level="error")
-        
+            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=True, log_level="info")
         import json
         # 1. Determine Model
         tier = ""
@@ -804,7 +803,15 @@ class ExperimentRunner:
         # 5. Record with full data
         # Convert nemo_result dict to string for CSV
         nemo_str = json.dumps(nemo_result) if nemo_result else "{}"
-        
+        if hasattr(tracker, 'final_emissions'):
+            final_data = tracker.final_emissions
+            energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
+            cpu_power = getattr(final_data, 'cpu_power', 0.0)
+            gpu_power = getattr(final_data, 'gpu_power', 0.0)
+            ram_power = getattr(final_data, 'ram_power', 0.0)
+            cpu_energy = getattr(final_data, 'cpu_energy', 0.0)
+            gpu_energy = getattr(final_data, 'gpu_energy', 0.0)
+            ram_energy = getattr(final_data, 'ram_energy', 0.0)
         row = {
             "scenario_id": sc["id"],
             "scenario_name": sc["name"],

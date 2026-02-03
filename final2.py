@@ -761,8 +761,8 @@ class ExperimentRunner:
                     duration = tracker._last_measured_time - tracker._start_time
                 
                 # Access the tracker's internal data for comprehensive logging
-                if hasattr(tracker, 'final_emissions'):
-                    final_data = tracker.final_emissions
+                if hasattr(tracker, 'final_emissions_data'):
+                    final_data = tracker.final_emissions_data
                     energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
                     cpu_power = getattr(final_data, 'cpu_power', 0.0)
                     gpu_power = getattr(final_data, 'gpu_power', 0.0)
@@ -803,15 +803,7 @@ class ExperimentRunner:
         # 5. Record with full data
         # Convert nemo_result dict to string for CSV
         nemo_str = json.dumps(nemo_result) if nemo_result else "{}"
-        if hasattr(tracker, 'final_emissions'):
-            final_data = tracker.final_emissions
-            energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
-            cpu_power = getattr(final_data, 'cpu_power', 0.0)
-            gpu_power = getattr(final_data, 'gpu_power', 0.0)
-            ram_power = getattr(final_data, 'ram_power', 0.0)
-            cpu_energy = getattr(final_data, 'cpu_energy', 0.0)
-            gpu_energy = getattr(final_data, 'gpu_energy', 0.0)
-            ram_energy = getattr(final_data, 'ram_energy', 0.0)
+        # No need to re-extract - data already extracted above
         row = {
             "scenario_id": sc["id"],
             "scenario_name": sc["name"],

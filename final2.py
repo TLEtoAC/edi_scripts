@@ -20,8 +20,9 @@
 # ## 1. Imports and Dependencies
 
 # %%
-import argparse
 import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+import argparse
 import torch
 import pandas as pd
 import numpy as np
@@ -149,16 +150,32 @@ class ModelManager:
         }
 
     def get_device(self):
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            return "cuda"
+        elif torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+
+
 
     def load_tier1(self):
-        """Loads Tier 1: Phi-3 Mini"""
         if self.models["tier1"] is not None:
             return self.models["tier1"], self.tokenizers["tier1"]
 
-        print("Loading Tier 1 (Phi-3 Mini)...")
-        model_id = "microsoft/Phi-3-mini-4k-instruct"
+        print("Loading Tier 1 (tinyllama)...")
+        model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         return self._load_generic_model("tier1", model_id, use_cache_config=False)
+
+
+    def load_tier3(self):
+        """Loads Tier 3: Phi-3 Mini"""
+        if self.models["tier3"] is not None:
+            return self.models["tier3"], self.tokenizers["tier3"]
+
+        print("Loading Tier 3 (Phi-3 Mini)...")
+        model_id = "microsoft/Phi-3-mini-4k-instruct"
+        return self._load_generic_model("tier3", model_id, use_cache_config=False)
+
 
     def load_tier2(self):
         """Loads Tier 2: Gemini 2.5 Flash (via API)"""
@@ -175,24 +192,25 @@ class ModelManager:
         except Exception as e:
             print(f"Error initializing Gemini 2.5 Flash for tier2: {e}")
             return None, None
-
-
-    def load_tier3(self):
-        """Loads Tier 3: Gemini 2.5 Flash (via API)"""
+    
+    
+    # def load_tier3(self):
+    #     """Loads Tier 3: Gemini 2.5 Flash (via API)"""
        
-        if self.models["tier3"] is not None:
-            return self.models["tier3"], None
+    #     if self.models["tier3"] is not None:
+    #         return self.models["tier3"], None
 
-        print("Loading Tier 3 (Gemini 2.5 Flash)...") 
-        try:
-            # Initialize Gemini 2.5 Flash model
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            self.models["tier3"] = model
-            print("Gemini 2.5 Flash model initialized successfully")
-            return model, None
-        except Exception as e:
-            print(f"Error initializing Gemini 2.5 Flash: {e}")
-            return None, None
+    #     print("Loading Tier 3 (Gemini 2.5 Flash)...") 
+    #     try:
+    #         # Initialize Gemini 2.5 Flash model
+    #         model = genai.GenerativeModel('gemini-2.5-flash')
+    #         self.models["tier3"] = model
+    #         print("Gemini 2.5 Flash model initialized successfully")
+    #         return model, None
+    #     except Exception as e:
+    #         print(f"Error initializing Gemini 2.5 Flash: {e}")
+    #         return None, None
+     
 
     def _load_generic_model(self, tier_key, model_id, use_auth=False, use_cache_config=True):
         token = os.getenv("HF_TOKEN") if use_auth else None
@@ -306,8 +324,8 @@ class ModelManager:
             
         model, tokenizer = model_weights
         
-        # Special handling for Gemini (tier2 and tier3)
-        if tier in ["tier2", "tier3"]:
+        # Special handling for Gemini (tier2)
+        if tier == "tier2":
             try:
                 response = model.generate_content(
                     prompt,
@@ -321,7 +339,7 @@ class ModelManager:
                 print(f"Error generating with Gemini ({tier}): {e}")
                 return f"Error: Gemini generation failed - {e}"
         
-        # For tier1 (transformer model - Phi-3)
+        # For tier1 and tier3 (transformer models - TinyLlama and Phi-3)
         messages = [{"role": "user", "content": prompt}]
         try:
             inputs = tokenizer.apply_chat_template(
@@ -517,7 +535,7 @@ Let's think step by step. Put your final answer within ####.
 ####"""
             ref = item['answer']
             
-        return prompt, ref, display_name
+        return prompt, ref, display_name 
 
 # %% [markdown]
 # ## 6. Evaluator Class
@@ -668,12 +686,7 @@ class ExperimentRunner:
         if "all" not in self.args.scenarios:
              active_scenarios = [s for s in self.scenarios if s["id"] in self.args.scenarios]
 
-        # 3. CodeCarbon
-        tracker = None
-        if not self.args.no_tracking:
-            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=False, log_level="error")
-
-        print(f"Starting Experiment: {self.args.samples} samples...")
+       
 
         # 4. Main Loop
         for ds_name, subset, split in target_dsets:
@@ -701,6 +714,13 @@ class ExperimentRunner:
         self._save_results()
 
     def _run_scenario(self, sc, idx, prompt, ref, category, nemo_result, ds_name, tracker):
+         # 3. CodeCarbon
+        tracker = None
+        if not self.args.no_tracking:
+            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=False, log_level="error")
+
+        print(f"Starting Experiment: {self.args.samples} samples...")
+        
         import json
         # 1. Determine Model
         tier = ""
@@ -722,11 +742,51 @@ class ExperimentRunner:
 
         # 3. Generation & Emissions
         emissions = 0.0
+        energy_consumed = 0.0
+        duration = 0.0
+        cpu_power = 0.0
+        gpu_power = 0.0
+        ram_power = 0.0
+        cpu_energy = 0.0
+        gpu_energy = 0.0
+        ram_energy = 0.0
+        
         output = ""
         try:
-            if tracker: tracker.start()
+            if tracker: 
+                tracker.start()
             output = self.mm.generate(tier, final_prompt)
-            if tracker: emissions = tracker.stop()
+            if tracker: 
+                emissions = tracker.stop()
+                
+                # Get detailed metrics from tracker's final_emissions object
+                if hasattr(tracker, '_last_measured_time') and hasattr(tracker, '_start_time'):
+                    duration = tracker._last_measured_time - tracker._start_time
+                
+                # Access the tracker's internal data for comprehensive logging
+                if hasattr(tracker, 'final_emissions'):
+                    final_data = tracker.final_emissions
+                    energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
+                    cpu_power = getattr(final_data, 'cpu_power', 0.0)
+                    gpu_power = getattr(final_data, 'gpu_power', 0.0)
+                    ram_power = getattr(final_data, 'ram_power', 0.0)
+                    cpu_energy = getattr(final_data, 'cpu_energy', 0.0)
+                    gpu_energy = getattr(final_data, 'gpu_energy', 0.0)
+                    ram_energy = getattr(final_data, 'ram_energy', 0.0)
+                    
+                # Log detailed emissions data
+                print(f"[CODECARBON] Emissions: {emissions} kg CO2")
+                print(f"[CODECARBON] Energy consumed: {energy_consumed} kWh")
+                print(f"[CODECARBON] Duration: {duration:.2f}s")
+                print(f"[CODECARBON] CPU Power: {cpu_power}W, Energy: {cpu_energy} kWh")
+                print(f"[CODECARBON] GPU Power: {gpu_power}W, Energy: {gpu_energy} kWh")
+                print(f"[CODECARBON] RAM Power: {ram_power}W, Energy: {ram_energy} kWh")
+                
+                # Handle NaN or None values
+                if emissions is None or (isinstance(emissions, float) and (emissions != emissions or emissions == float('inf'))):
+                    print(f"[WARNING] Got invalid emissions value: {emissions}, setting to 0.0")
+                    emissions = 0.0
+                    
             print("ek prompt hogaya")
             print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         except Exception as e:
@@ -760,6 +820,14 @@ class ExperimentRunner:
             "compressed_prompt_len": c_stats["final"],
             "compression_rate": c_stats["rate"],
             "carbon_kg": emissions,
+            "energy_consumed_kwh": energy_consumed,
+            "duration_seconds": duration,
+            "cpu_power_w": cpu_power,
+            "gpu_power_w": gpu_power,
+            "ram_power_w": ram_power,
+            "cpu_energy_kwh": cpu_energy,
+            "gpu_energy_kwh": gpu_energy,
+            "ram_energy_kwh": ram_energy,
             "accuracy_score": score,
             "score_type": stype,
             "full_prompt": prompt,
@@ -771,6 +839,10 @@ class ExperimentRunner:
         
         # Immediately save to CSV to prevent data loss
         self._append_to_csv(row)
+        
+        # Small delay only for API calls to avoid rate limiting
+        if tier == "tier2":
+            time.sleep(1)
 
     def _initialize_csv(self):
         """Initialize CSV file with headers if it doesn't exist or is empty."""
@@ -779,7 +851,10 @@ class ExperimentRunner:
                 "scenario_id", "scenario_name", "dataset", "sample_index",
                 "prompt_complexity", "nemo_complexity_score", "nemo_raw_output",
                 "model_used", "original_prompt_len",
-                "compressed_prompt_len", "compression_rate", "carbon_kg",
+                "compressed_prompt_len", "compression_rate", 
+                "carbon_kg", "energy_consumed_kwh", "duration_seconds",
+                "cpu_power_w", "gpu_power_w", "ram_power_w",
+                "cpu_energy_kwh", "gpu_energy_kwh", "ram_energy_kwh",
                 "accuracy_score", "score_type", 
                 "full_prompt", "full_output", "output_excerpt", "timestamp"
             ]
@@ -811,7 +886,10 @@ class ExperimentRunner:
                     "scenario_id", "scenario_name", "dataset", "sample_index",
                     "prompt_complexity", "nemo_complexity_score", "nemo_raw_output",
                     "model_used", "original_prompt_len",
-                    "compressed_prompt_len", "compression_rate", "carbon_kg",
+                    "compressed_prompt_len", "compression_rate",
+                    "carbon_kg", "energy_consumed_kwh", "duration_seconds",
+                    "cpu_power_w", "gpu_power_w", "ram_power_w",
+                    "cpu_energy_kwh", "gpu_energy_kwh", "ram_energy_kwh",
                     "accuracy_score", "score_type",
                     "full_prompt", "full_output", "output_excerpt", "timestamp"
                 ]
@@ -863,7 +941,7 @@ class ExperimentRunner:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", type=int, default=5)
-    parser.add_argument("--output_csv", type=str, default="evaluation_scenarios_results.csv")
+    parser.add_argument("--output_csv", type=str, default="ecoprompt_results.csv")
     parser.add_argument("--no_tracking", action="store_true")
     parser.add_argument("--datasets", nargs="+", default=["all"])
     parser.add_argument("--scenarios", nargs="+", default=["all"])
@@ -914,41 +992,45 @@ if __name__ == "__main__":
 
 # %%
 # Example: Run on GSM8K with 10 samples
-class Args:
-    samples = 10
-    output_csv = "evaluation_scenarios_results.csv"
-    no_tracking = False
-    datasets = ["gsm8k"]
-    scenarios = ["all"]
-    data_root = None
+# NOTE: This section is for Jupyter notebook execution only
+# When running as a script, use command-line arguments instead
+# Uncomment the code below if running in Jupyter notebook:
 
-args = Args()
+# class Args:
+#     samples = 10
+#     output_csv = "evaluation_scenarios_results.csv"
+#     no_tracking = False
+#     datasets = ["gsm8k"]
+#     scenarios = ["all"]
+#     data_root = None
 
-# Determine project root
-script_dir = os.getcwd()
-parent_dir = os.path.dirname(script_dir)
+# args = Args()
 
-if os.path.exists(os.path.join(parent_dir, "data")):
-    project_root = parent_dir
-elif os.path.exists(os.path.join(script_dir, "data")):
-    project_root = script_dir
-else:
-    project_root = parent_dir
+# # Determine project root
+# script_dir = os.getcwd()
+# parent_dir = os.path.dirname(script_dir)
 
-print(f"[INFO] Using data root: {project_root}")
-print(f"[INFO] Looking for data in: {os.path.join(project_root, 'data')}")
+# if os.path.exists(os.path.join(parent_dir, "data")):
+#     project_root = parent_dir
+# elif os.path.exists(os.path.join(script_dir, "data")):
+#     project_root = script_dir
+# else:
+#     project_root = parent_dir
 
-# %% [markdown]
-# ## 10. Execute Experiment
-# **Run the cell below to start the evaluation.**
+# print(f"[INFO] Using data root: {project_root}")
+# print(f"[INFO] Looking for data in: {os.path.join(project_root, 'data')}")
 
-# %%
-# Create and run the experiment
-runner = ExperimentRunner(args, data_root=project_root)
-runner.run()
+# # %% [markdown]
+# # ## 10. Execute Experiment
+# # **Run the cell below to start the evaluation.**
 
-print("\n✅ Experiment complete!")
-print(f"Results saved to: {args.output_csv}")
+# # %%
+# # Create and run the experiment
+# runner = ExperimentRunner(args, data_root=project_root)
+# runner.run()
+
+# print("\n✅ Experiment complete!")
+# print(f"Results saved to: {args.output_csv}")
 
 # %% [markdown]
 # ## 11. View Results

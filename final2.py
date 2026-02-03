@@ -714,12 +714,10 @@ class ExperimentRunner:
         self._save_results()
 
     def _run_scenario(self, sc, idx, prompt, ref, category, nemo_result, ds_name, tracker):
-         # 3. CodeCarbon
+        # Initialize fresh tracker for each prompt
         tracker = None
         if not self.args.no_tracking:
             tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=False, log_level="error")
-
-        print(f"Starting Experiment: {self.args.samples} samples...")
         
         import json
         # 1. Determine Model
@@ -839,6 +837,11 @@ class ExperimentRunner:
         
         # Immediately save to CSV to prevent data loss
         self._append_to_csv(row)
+        
+        # Cleanup tracker to avoid resource leaks
+        if tracker:
+            del tracker
+            gc.collect()
         
         # Small delay only for API calls to avoid rate limiting
         if tier == "tier2":
@@ -1037,25 +1040,25 @@ if __name__ == "__main__":
 # Load and display the evaluation results.
 
 # %%
-# Load results
-results_df = pd.read_csv("evaluation_scenarios_results.csv")
-summary_df = pd.read_csv("evaluation_scenarios_results_summary.csv")
-pivot_df = pd.read_csv("evaluation_scenarios_results_per_prompt.csv")
-
-print("=" * 60)
-print("SUMMARY RESULTS")
-print("=" * 60)
-display(summary_df)
-
-print("\n" + "=" * 60)
-print("DETAILED RESULTS (First 10 rows)")
-print("=" * 60)
-display(results_df.head(10))
-
-print("\n" + "=" * 60)
-print("PER-PROMPT COMPARISON (First 5 rows)")
-print("=" * 60)
-display(pivot_df.head(5))
+# Load results (for Jupyter notebook only - uncomment if needed)
+# results_df = pd.read_csv("ecoprompt_results.csv")
+# summary_df = pd.read_csv("ecoprompt_results_summary.csv")
+# pivot_df = pd.read_csv("ecoprompt_results_per_prompt.csv")
+# 
+# print("=" * 60)
+# print("SUMMARY RESULTS")
+# print("=" * 60)
+# display(summary_df)
+# 
+# print("\n" + "=" * 60)
+# print("DETAILED RESULTS (First 10 rows)")
+# print("=" * 60)
+# display(results_df.head(10))
+# 
+# print("\n" + "=" * 60)
+# print("PER-PROMPT COMPARISON (First 5 rows)")
+# print("=" * 60)
+# display(pivot_df.head(5))
 
 # %% [markdown]
 # ## 12. Visualize Results

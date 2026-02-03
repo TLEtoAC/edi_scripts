@@ -717,7 +717,7 @@ class ExperimentRunner:
         # Initialize fresh tracker for each prompt
         tracker = None
         if not self.args.no_tracking:
-            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=True, log_level="info")
+            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=True, log_level="error")
         import json
         # 1. Determine Model
         tier = ""
@@ -898,7 +898,7 @@ class ExperimentRunner:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writerow(row)
                 f.flush()  # Force write to disk immediately
-                os.fsync(f.fileno())  # Ensure OS buffers are written to disk
+                 #os.fsync(f.fileno())  # Ensure OS buffers are written to disk
         except Exception as e:
             print(f"Error appending to CSV: {e}")
     

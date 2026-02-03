@@ -709,11 +709,11 @@ class ExperimentRunner:
                 for sc in active_scenarios:
                     if self.interrupted:
                         break
-                    self._run_scenario(sc, i, prompt, ref, category, nemo_result, unique_ds_name, tracker)
+                    self._run_scenario(sc, i, prompt, ref, category, nemo_result, unique_ds_name)
 
         self._save_results()
 
-    def _run_scenario(self, sc, idx, prompt, ref, category, nemo_result, ds_name, tracker):
+    def _run_scenario(self, sc, idx, prompt, ref, category, nemo_result, ds_name):
         # Initialize fresh tracker for each prompt
         tracker = None
         if not self.args.no_tracking:

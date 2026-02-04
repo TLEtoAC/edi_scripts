@@ -715,9 +715,9 @@ class ExperimentRunner:
 
     def _run_scenario(self, sc, idx, prompt, ref, category, nemo_result, ds_name):
         # Initialize fresh tracker for each prompt
-        tracker = None
-        if not self.args.no_tracking:
-            tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=True, log_level="error")
+        #tracker = None
+        # if not self.args.no_tracking:
+        #     tracker = EmissionsTracker(project_name="ecoprompt", measure_power_secs=1, save_to_file=True, log_level="error")
         import json
         # 1. Determine Model
         tier = ""
@@ -750,46 +750,46 @@ class ExperimentRunner:
         
         output = ""
         try:
-            if tracker: 
-                tracker.start()
+            # if tracker: 
+            #     tracker.start()
             output = self.mm.generate(tier, final_prompt)
-            if tracker: 
-                emissions = tracker.stop()
+            # if tracker: 
+            #     emissions = tracker.stop()
                 
                 # Get detailed metrics from tracker's final_emissions object
-                if hasattr(tracker, '_last_measured_time') and hasattr(tracker, '_start_time'):
-                    duration = tracker._last_measured_time - tracker._start_time
+                # if hasattr(tracker, '_last_measured_time') and hasattr(tracker, '_start_time'):
+                #     duration = tracker._last_measured_time - tracker._start_time
                 
                 # Access the tracker's internal data for comprehensive logging
-                if hasattr(tracker, 'final_emissions_data'):
-                    final_data = tracker.final_emissions_data
-                    energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
-                    cpu_power = getattr(final_data, 'cpu_power', 0.0)
-                    gpu_power = getattr(final_data, 'gpu_power', 0.0)
-                    ram_power = getattr(final_data, 'ram_power', 0.0)
-                    cpu_energy = getattr(final_data, 'cpu_energy', 0.0)
-                    gpu_energy = getattr(final_data, 'gpu_energy', 0.0)
-                    ram_energy = getattr(final_data, 'ram_energy', 0.0)
+                # if hasattr(tracker, 'final_emissions_data'):
+                #     final_data = tracker.final_emissions_data
+                #     energy_consumed = getattr(final_data, 'energy_consumed', 0.0)
+                #     cpu_power = getattr(final_data, 'cpu_power', 0.0)
+                #     gpu_power = getattr(final_data, 'gpu_power', 0.0)
+                #     ram_power = getattr(final_data, 'ram_power', 0.0)
+                #     cpu_energy = getattr(final_data, 'cpu_energy', 0.0)
+                #     gpu_energy = getattr(final_data, 'gpu_energy', 0.0)
+                #     ram_energy = getattr(final_data, 'ram_energy', 0.0)
                     
-                # Log detailed emissions data
-                print(f"[CODECARBON] Emissions: {emissions} kg CO2")
-                print(f"[CODECARBON] Energy consumed: {energy_consumed} kWh")
-                print(f"[CODECARBON] Duration: {duration:.2f}s")
-                print(f"[CODECARBON] CPU Power: {cpu_power}W, Energy: {cpu_energy} kWh")
-                print(f"[CODECARBON] GPU Power: {gpu_power}W, Energy: {gpu_energy} kWh")
-                print(f"[CODECARBON] RAM Power: {ram_power}W, Energy: {ram_energy} kWh")
+                # # Log detailed emissions data
+                # print(f"[CODECARBON] Emissions: {emissions} kg CO2")
+                # print(f"[CODECARBON] Energy consumed: {energy_consumed} kWh")
+                # print(f"[CODECARBON] Duration: {duration:.2f}s")
+                # print(f"[CODECARBON] CPU Power: {cpu_power}W, Energy: {cpu_energy} kWh")
+                # print(f"[CODECARBON] GPU Power: {gpu_power}W, Energy: {gpu_energy} kWh")
+                # print(f"[CODECARBON] RAM Power: {ram_power}W, Energy: {ram_energy} kWh")
                 
-                # Handle NaN or None values
-                if emissions is None or (isinstance(emissions, float) and (emissions != emissions or emissions == float('inf'))):
-                    print(f"[WARNING] Got invalid emissions value: {emissions}, setting to 0.0")
-                    emissions = 0.0
+                # # Handle NaN or None values
+                # if emissions is None or (isinstance(emissions, float) and (emissions != emissions or emissions == float('inf'))):
+                #     print(f"[WARNING] Got invalid emissions value: {emissions}, setting to 0.0")
+                #     emissions = 0.0
                     
             print("ek prompt hogaya")
             print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         except Exception as e:
             print(f"Gen Error: {e}")
             output = "Error"
-            if tracker and tracker._start_time: tracker.stop()
+           # if tracker and tracker._start_time: tracker.stop()
 
         # 4. Score
         score = 0.0
@@ -816,15 +816,6 @@ class ExperimentRunner:
             "original_prompt_len": c_stats["init"],
             "compressed_prompt_len": c_stats["final"],
             "compression_rate": c_stats["rate"],
-            "carbon_kg": emissions,
-            "energy_consumed_kwh": energy_consumed,
-            "duration_seconds": duration,
-            "cpu_power_w": cpu_power,
-            "gpu_power_w": gpu_power,
-            "ram_power_w": ram_power,
-            "cpu_energy_kwh": cpu_energy,
-            "gpu_energy_kwh": gpu_energy,
-            "ram_energy_kwh": ram_energy,
             "accuracy_score": score,
             "score_type": stype,
             "full_prompt": prompt,
@@ -838,9 +829,9 @@ class ExperimentRunner:
         self._append_to_csv(row)
         
         # Cleanup tracker to avoid resource leaks
-        if tracker:
-            del tracker
-            gc.collect()
+        # if tracker:
+        #     del tracker
+        #     gc.collect()
         
         # Small delay only for API calls to avoid rate limiting
         if tier == "tier2":
@@ -854,9 +845,6 @@ class ExperimentRunner:
                 "prompt_complexity", "nemo_complexity_score", "nemo_raw_output",
                 "model_used", "original_prompt_len",
                 "compressed_prompt_len", "compression_rate", 
-                "carbon_kg", "energy_consumed_kwh", "duration_seconds",
-                "cpu_power_w", "gpu_power_w", "ram_power_w",
-                "cpu_energy_kwh", "gpu_energy_kwh", "ram_energy_kwh",
                 "accuracy_score", "score_type", 
                 "full_prompt", "full_output", "output_excerpt", "timestamp"
             ]

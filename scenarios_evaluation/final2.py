@@ -254,7 +254,7 @@ class ModelManager:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
                         torch_dtype=torch.float16, 
-                        device_map="auto",
+                        device_map="cuda",
                         token=token,
                         trust_remote_code=True,
                         local_files_only=True
@@ -266,7 +266,7 @@ class ModelManager:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
                         torch_dtype=torch.float16, 
-                        device_map="auto",
+                        device_map="cuda",
                         token=token,
                         trust_remote_code=True
                     )

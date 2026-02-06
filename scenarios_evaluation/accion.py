@@ -187,9 +187,9 @@ class ModelManager:
         if self.models["tier1"] is not None:
             return self.models["tier1"], self.tokenizers["tier1"]
 
-        print("Loading Tier 1 (tinyllama)...")
-        model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-        return self._load_generic_model("tier1", model_id, use_cache_config=False)
+        print("Loading Tier 1 (Mistral 7B)...")
+        model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        return self._load_generic_model("tier1", model_id, use_auth=False, use_cache_config=False)
 
 
     def load_tier3(self):
@@ -208,7 +208,7 @@ class ModelManager:
             return self.models["tier2"], self.tokenizers["tier2"]
 
         print("Loading Tier 2 (Mistral 7B)...")
-        model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+        model_id = "mistralai/Mistral-7B-Instruct-v0.3"
         
         return self._load_generic_model("tier2", model_id, use_auth=False, use_cache_config=False)
     
@@ -276,7 +276,8 @@ class ModelManager:
                         device_map="cuda",
                         token=token,
                         trust_remote_code=True,
-                        local_files_only=True
+                        local_files_only=True,
+                        attn_implementation="eager"
                     )
                     print(f"Loaded {tier_key} from local cache.")
                 except OSError:
@@ -285,9 +286,10 @@ class ModelManager:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
                         torch_dtype=torch.float16, 
-                        device_map="auto",
+                        device_map="cuda",
                         token=token,
-                        trust_remote_code=True
+                        trust_remote_code=True,
+                        attn_implementation="eager"
                     )
             
             # Phi-3 specific fix from original code
@@ -343,7 +345,7 @@ class ModelManager:
             
         model, tokenizer = model_weights
         
-        # Special handling for Gemini (tier2)
+      
         
         # For tier1 and tier3 (transformer models - TinyLlama and Phi-3)
         messages = [{"role": "user", "content": prompt}]
@@ -828,7 +830,8 @@ class ExperimentRunner:
             "full_prompt": prompt,
             "full_output": output,
             "output_excerpt": output[:100].replace("\n", " "),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "carbon_kg": emissions
         }
         self.results.append(row)
         

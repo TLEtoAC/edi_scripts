@@ -511,7 +511,7 @@ class DatasetLoader:
                 return []
             
             ds = ds_dict[split_name]
-            start_idx = 1000
+            start_idx = 0
             ds = ds.select(range(start_idx, min(len(ds), start_idx + samples)))
             return ds
         except Exception as e:

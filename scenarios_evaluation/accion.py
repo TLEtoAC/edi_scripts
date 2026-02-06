@@ -40,7 +40,7 @@ from tqdm import tqdm
 from codecarbon import EmissionsTracker
 from llmlingua import PromptCompressor
 from dotenv import load_dotenv
-import google.generativeai as genai
+#import google.generativeai as genai
 import requests
 import json
 

@@ -269,14 +269,14 @@ class ModelManager:
             else:
                 # CUDA or CPU - use device_map="auto"
                 try:
-                    tokenizer = AutoTokenizer.from_pretrained(model_id, token=token, local_files_only=True)
+                    tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
-                        torch_dtype=torch.float16, 
+                        dtype=torch.float16, 
                         device_map="cuda",
                         token=token,
-                        trust_remote_code=True,
-                        local_files_only=True,
+                        # trust_remote_code=True,
+                        # local_files_only=True,
                         attn_implementation="eager"
                     )
                     print(f"Loaded {tier_key} from local cache.")
@@ -285,10 +285,10 @@ class ModelManager:
                     tokenizer = AutoTokenizer.from_pretrained(model_id, token=token)
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
-                        torch_dtype=torch.float16, 
+                        dtype=torch.float16, 
                         device_map="cuda",
                         token=token,
-                        trust_remote_code=True,
+                        # trust_remote_code=True,
                         attn_implementation="eager"
                     )
             

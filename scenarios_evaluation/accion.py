@@ -203,20 +203,14 @@ class ModelManager:
 
 
     def load_tier2(self):
-        """Loads Tier 2: Gemini 2.5 Flash (via API)"""
+        """Loads Tier 2: Mistral 7B"""
         if self.models["tier2"] is not None:
-            return self.models["tier2"], None
+            return self.models["tier2"], self.tokenizers["tier2"]
 
-        print("Loading Tier 2 (Gemini 2.5 Flash)...") 
-        try:
-            # Initialize Gemini 2.5 Flash model
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            self.models["tier2"] = model
-            print("Gemini 2.5 Flash model initialized successfully for tier2")
-            return model, None
-        except Exception as e:
-            print(f"Error initializing Gemini 2.5 Flash for tier2: {e}")
-            return None, None
+        print("Loading Tier 2 (Mistral 7B)...")
+        model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+        
+        return self._load_generic_model("tier2", model_id, use_auth=False, use_cache_config=False)
     
     
     # def load_tier3(self):
@@ -279,7 +273,7 @@ class ModelManager:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id, 
                         torch_dtype=torch.float16, 
-                        device_map="auto",
+                        device_map="cuda",
                         token=token,
                         trust_remote_code=True,
                         local_files_only=True
@@ -350,19 +344,6 @@ class ModelManager:
         model, tokenizer = model_weights
         
         # Special handling for Gemini (tier2)
-        if tier == "tier2":
-            try:
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=1000,  # Increased for longer reasoning
-                        temperature=0.9,
-                    )
-                )
-                return response.text.strip()
-            except Exception as e:
-                print(f"Error generating with Gemini ({tier}): {e}")
-                return f"Error: Gemini generation failed - {e}"
         
         # For tier1 and tier3 (transformer models - TinyLlama and Phi-3)
         messages = [{"role": "user", "content": prompt}]
@@ -778,7 +759,7 @@ class ExperimentRunner:
         try:
             # if tracker: 
             #     tracker.start()
-            output = accion_generate(final_prompt)
+            output = self.mm.generate(tier, final_prompt)
             # if tracker: 
             #     emissions = tracker.stop()
                 

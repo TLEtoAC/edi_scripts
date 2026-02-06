@@ -2,10 +2,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import time
 import os
+from dotenv import load_dotenv
 
-MODEL_PATH = "/home/user129/.cache/huggingface/hub/models--mistralai--Mistral-7B-Instruct-v0.2/snapshots/63a8b081895390a26e140280378bc85ec8bce07a"
+load_dotenv()
 
-print(f"Loading model from local path:\n{MODEL_PATH}")
+MODEL_PATH = "mistralai/Mistral-7B-Instruct-v0.3"
+
+print(f"Loading model: {MODEL_PATH}")
 start_time = time.time()
 
 if not torch.cuda.is_available():
@@ -16,14 +19,14 @@ print(f"Using device: {device}")
 
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_PATH,
-    local_files_only=True
+    token=os.getenv("HF_TOKEN")
 )
 
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_PATH,
     torch_dtype=torch.float16,
     device_map="auto",
-    local_files_only=True
+    token=os.getenv("HF_TOKEN")
 )
 
 print(f"Model loaded in {time.time() - start_time:.2f} seconds.")

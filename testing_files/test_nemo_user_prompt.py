@@ -10,7 +10,7 @@ if prompt_class_dir not in sys.path:
     sys.path.append(prompt_class_dir)
 
 try:
-    import temp as nvidia_classifier
+    import nvidia_classifier
 except ImportError as e:
     print(f"Error importing nvidia classifier: {e}")
     print(f"Checked path: {prompt_class_dir}")
@@ -62,6 +62,7 @@ def test_user_prompt(prompt):
             print(f"{key}: {value}")
             
         print(f"\n--- Classification ---")
+        print(result)
         print(f"Complexity Score: {complexity_score:.4f}")
         print(f"Category: {category}")
         print(f"Time Taken: {time.time() - start_time:.2f}s")

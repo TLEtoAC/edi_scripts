@@ -1,0 +1,3 @@
+scenario_id,scenario_name,dataset,sample_index,prompt_complexity,model_used,original_prompt_len_tokens,compressed_prompt_len_tokens,compression_rate,carbon_kg,energy_submitted_kwh,accuracy_score,score_type,output_excerpt
+S1,Upper Bound (All -> Tier 3),glue,0,Easy,tier3,18,18,1.0,0.0,0.0,1,accuracy,The relationship between the premise and hypothesis is neutral. The premise only suggests that the n
+S1,Upper Bound (All -> Tier 3),glue,0,Easy,tier3,13,13,1.0,0.0,0.0,1,accuracy,"The sentiment of the given sentence is positive. The phrase ""charming and often affecting journey"" s"

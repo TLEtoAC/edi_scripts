@@ -1,16 +1,23 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import time
+from codecarbon import EmissionsTracker
 
 model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+
+# Initialize codecarbon emissions tracker
+tracker = EmissionsTracker(
+    project_name="tinyllama_optimized_test",
+)
+
+
 
 print(f"Loading model {model_id}...")
 start_time = time.time()
 
 # Optimize for Apple Silicon (M-series chips)
 # Use 'mps' device if available, otherwise 'cpu'
-device = "mps" if torch.backends.mps.is_available() else "cpu"
-print(f"Using device: {device}")
+device = "mps"
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
@@ -28,7 +35,8 @@ prompt = "Explain transformers in simple terms."
 
 print(f"Generating response for prompt: '{prompt}'")
 inputs = tokenizer(prompt, return_tensors="pt").to(device)
-
+print("Starting emissions tracking...")
+tracker.start()
 with torch.no_grad():
     gen_start = time.time()
     outputs = model.generate(
@@ -44,4 +52,9 @@ response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print("\n--- Response ---")
 print(response)
 print("----------------")
+print("\nStopping emissions tracking...")
+emissions = tracker.stop()
+print(emissions)
 print(f"Generation took {gen_end - gen_start:.2f} seconds.")
+
+# Stop tracking and get emissions data

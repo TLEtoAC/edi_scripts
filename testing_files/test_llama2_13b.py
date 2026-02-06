@@ -12,23 +12,28 @@ if not token:
     pass
 
 # Llama 2 13B Chat
-model_id = "meta-llama/Llama-2-13b-chat-hf"
+model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
 
 print(f"Loading model {model_id}...")
 start_time = time.time()
 
-# Optimize for Apple Silicon (M-series chips)
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+# Optimize for NVIDIA GPU or Apple Silicon (M-series chips)
+if torch.cuda.is_available():
+    device = "cuda"
+elif torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
 print(f"Using device: {device}")
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
-    dtype=torch.float16, # Use float16 to reduce memory usage
-    device_map=device,
-    attn_implementation="eager"
+    torch_dtype=torch.float16, # Use float16 to reduce memory usage
+    device_map="auto",
 )
+
 
 print(f"Model loaded in {time.time() - start_time:.2f} seconds.")
 

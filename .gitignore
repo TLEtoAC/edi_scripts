@@ -1,3 +1,9 @@
 data/
+datasets/
 .env
 env/
+_pycache_/
+.csv
+eluetherai/
+Classification_model/
+datasetsave/

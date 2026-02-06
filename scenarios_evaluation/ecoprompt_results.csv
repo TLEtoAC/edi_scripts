@@ -1,0 +1,33 @@
+scenario_id,scenario_name,dataset,sample_index,prompt_complexity,nemo_complexity_score,nemo_raw_output,model_used,original_prompt_len,compressed_prompt_len,compression_rate,carbon_kg,energy_consumed_kwh,duration_seconds,cpu_power_w,gpu_power_w,ram_power_w,cpu_energy_kwh,gpu_energy_kwh,ram_energy_kwh,accuracy_score,score_type,full_prompt,full_output,output_excerpt,timestamp
+S2,Lower Bound (Tier 1),gsm8k/main,0,Easy,0.2629,"{""task_type_1"": [""Open QA""], ""task_type_2"": [""Closed QA""], ""task_type_prob"": [0.486], ""creativity_scope"": [0.0857], ""reasoning"": [0.2281], ""contextual_knowledge"": [0.0581], ""number_of_few_shots"": [0], ""domain_knowledge"": [0.1858], ""no_label_reason"": [0.0], ""constraint_ct"": [0.9674], ""prompt_complexity_score"": [0.2629]}",tier1,65,65,1.0,0.00012795518708029726,0.0,54.94501091600068,0.0,0.0,0.0,0.0,0.0,0.0,0,EM,"Question: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+Let's think step by step. Put your final answer within ####.
+####","Multiplying the number of eggs she eats with three (3) by the number of muffins she bakes with four (4) gives us:
+```
+6 x 4 = 24
+```
+Dividing the total amount (24) by the number of eggs she eats (16) gives us:
+```
+1/16 = 0.000833333 or 8.33% of her daily eggs consumption
+```
+According to her daily egg consumption, Janet averages 16 eggs per day, and 8.33% is her share of the remaining 7.34%. So, her income at the farmers' market is:
+```
+7.34 - $2 * 8.33%
+= $4.92
+```
+This is £2 in British pounds or €2 in Euro.",Multiplying the number of eggs she eats with three (3) by the number of muffins she bakes with four ,2026-02-03 16:28:15
+S2,Lower Bound (Tier 1),gsm8k/main,0,Easy,0.2629,"{""task_type_1"": [""Open QA""], ""task_type_2"": [""Closed QA""], ""task_type_prob"": [0.486], ""creativity_scope"": [0.0857], ""reasoning"": [0.2281], ""contextual_knowledge"": [0.0581], ""number_of_few_shots"": [0], ""domain_knowledge"": [0.1858], ""no_label_reason"": [0.0], ""constraint_ct"": [0.9674], ""prompt_complexity_score"": [0.2629]}",tier1,65,65,1.0,6.528316458701321e-07,0.0,56.920982875000846,0.0,0.0,0.0,0.0,0.0,0.0,0,EM,"Question: Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+Let's think step by step. Put your final answer within ####.
+####","Multiplying the number of eggs she eats with three (3) by the number of muffins she bakes with four (4) gives us:
+```
+6 x 4 = 24
+```
+Dividing the total amount (24) by the number of eggs she eats (16) gives us:
+```
+1/16 = 0.000833333 or 8.33% of her daily eggs consumption
+```
+According to her daily egg consumption, Janet averages 16 eggs per day, and 8.33% is her share of the remaining 7.34%. So, her income at the farmers' market is:
+```
+7.34 - $2 * 8.33%
+= $4.92
+```
+This is £2 in British pounds or €2 in Euro.",Multiplying the number of eggs she eats with three (3) by the number of muffins she bakes with four ,2026-02-03 17:00:36

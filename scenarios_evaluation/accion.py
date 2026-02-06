@@ -80,48 +80,48 @@ except ImportError as e:
 
 # %%
 # Test Gemini API configuration
-print("🔍 Testing Gemini API Key...")
+# print("🔍 Testing Gemini API Key...")
 
-api_key = os.getenv("GOOGLE_API_KEY")
+# api_key = os.getenv("GOOGLE_API_KEY")
 
-if not api_key:
-    print("❌ ERROR: GOOGLE_API_KEY not found in environment variables!")
-    print("\n💡 Please add your Google API key to the .env file:")
-    print("   GOOGLE_API_KEY=your_api_key_here")
-    print("\n🔗 Get your API key from: https://makersuite.google.com/app/apikey")
-else:
-    print(f"✅ API Key found: {api_key[:10]}...{api_key[-5:]}")
+# if not api_key:
+#     print("❌ ERROR: GOOGLE_API_KEY not found in environment variables!")
+#     print("\n💡 Please add your Google API key to the .env file:")
+#     print("   GOOGLE_API_KEY=your_api_key_here")
+#     print("\n🔗 Get your API key from: https://makersuite.google.com/app/apikey")
+# else:
+#     print(f"✅ API Key found: {api_key[:10]}...{api_key[-5:]}")
     
-    # Configure and test Gemini
-    try:
-        genai.configure(api_key=api_key)
-        print("✅ Gemini API configured successfully")
+#     # Configure and test Gemini
+#     try:
+#         genai.configure(api_key=api_key)
+#         print("✅ Gemini API configured successfully")
         
-        # Test with a simple prompt
-        print("\n📝 Testing with a simple prompt...")
-        test_model = genai.GenerativeModel('gemini-2.5-flash')
+#         # Test with a simple prompt
+#         print("\n📝 Testing with a simple prompt...")
+#         test_model = genai.GenerativeModel('gemini-2.5-flash')
         
-        response = test_model.generate_content(
-            "Say 'Hello! The API is working correctly.' in a friendly way.",
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=50,
-                temperature=0.7,
-            )
-        )
+#         response = test_model.generate_content(
+#             "Say 'Hello! The API is working correctly.' in a friendly way.",
+#             generation_config=genai.types.GenerationConfig(
+#                 max_output_tokens=50,
+#                 temperature=0.7,
+#             )
+#         )
         
-        print("\n" + "="*60)
-        print("🤖 GEMINI RESPONSE:")
-        print("="*60)
-        print(response.text)
-        print("="*60)
-        print("\n✅ SUCCESS! Gemini 2.5 Flash is working correctly! 🎉\n")
+#         print("\n" + "="*60)
+#         print("🤖 GEMINI RESPONSE:")
+#         print("="*60)
+#         print(response.text)
+#         print("="*60)
+#         print("\n✅ SUCCESS! Gemini 2.5 Flash is working correctly! 🎉\n")
         
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        print("\n💡 Please check:")
-        print("   1. API key is valid")
-        print("   2. You have API quota available")
-        print("   3. Internet connection is stable")
+#     except Exception as e:
+#         print(f"\n❌ ERROR: {e}")
+#         print("\n💡 Please check:")
+#         print("   1. API key is valid")
+#         print("   2. You have API quota available")
+#         print("   3. Internet connection is stable")
 
 # %% [markdown]
 # ## 3. ModelManager Class
